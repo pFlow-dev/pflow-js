@@ -795,8 +795,32 @@ const sandboxTemplate = (sourceCode, baseurl = "https://cdn.jsdelivr.net/gh/pFlo
 </body>
 </html>`;
 
-function pflow2Html(source, { baseurl }) {
-    return sandboxTemplate(source, baseurl);
+/**
+ * pflow@Html can be used from the browser or nodejs
+ * ```js
+ * require("fs");
+ * const p = require('./pflow.js');
+ * const { ticTacToe: source } = p.modelSource;
+ * fs.writeFileSync('index.html', p.pflow2Html(source,{}));
+ * ```
+ */
+function pflow2Html(source, opts) {
+    return sandboxTemplate(source, opts.baseurl);
+}
+
+/**
+ * pflow@makeSandbox can be only be used from nodejs
+ * and will write the code sample to a new index.html pflow editor
+ * ```js
+ * require('./src/pflow.js').makeSandbox();
+ * ```
+ * @param source - javascript source code for a pflow model
+ */
+function makeSandbox(source = defaultCodeSample) {
+    if (typeof module !== 'undefined') {
+        require("fs").writeFileSync('index.html', pflow2Html(source, {}));
+        return 'wrote index.html';
+    }
 }
 
 if (typeof module !== 'undefined') {
@@ -808,6 +832,7 @@ if (typeof module !== 'undefined') {
         pflow2Html,
         pflow2png,
         pflow2svg,
-        modelSource: { ticTacToe: defaultCodeSample }
+        modelSource: { ticTacToe: defaultCodeSample },
+        makeSandbox
     };
 }

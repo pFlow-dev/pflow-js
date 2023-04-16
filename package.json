@@ -11,8 +11,7 @@
     "test": "tests"
   },
   "scripts": {
-    "build": "babel src/pflow.js -o src/pflow.js",
-    "build:html": "node ./build.mjs && babel src/pflow.js -o src/pflow.js",
+    "build": "node -e \"require('./src/pflow.js').makeSandbox();\" && babel src/pflow.js -o src/pflow.js",
     "test": "jest"
   },
   "repository": {
