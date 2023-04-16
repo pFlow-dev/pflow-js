@@ -758,7 +758,7 @@ const defaultCodeSample = `function declaration({fn, cell, role}) {
     }
 }`;
 
-const sandboxTemplate = (sourceCode, baseurl = "https://pflow.dev/js/v0.4.0/") => `<!DOCTYPE html>
+const sandboxTemplate = (sourceCode, baseurl = "https://cdn.jsdelivr.net/gh/pFlow-dev/pflow-js@main/src/") => `<!DOCTYPE html>
 <html lang="en">
 <head>
     <title>pflow.dev</title>
