@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>pflow.dev</title>
+    <script src="https://cdn.jsdelivr.net/npm/jquery"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jquery.terminal/js/jquery.terminal.min.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/jquery.terminal/css/jquery.terminal.min.css" rel="stylesheet"/>
+    <script src="https://cdn.jsdelivr.net/npm/ace-builds@1.16.0/src-min-noconflict/ace.min.js "></script>
+    <style media="screen">
+        #editor {
+            height: 600px;
+            border: 1px solid black;
+            margin: 0;
+        }
+        #pflow-dev {
+            float: right;
+            border: 1px solid black;
+            max-width: 100%;
+        }
+        #termLink {
+            color: white;
+        }
+        #term {
+            min-height: 280px;
+            padding: 10px;
+            margin: 0;
+        }
+    </style>
+    <script src="./src/pflow.js"></script>
+</head>
+<body onload=pflowSandbox()>
+    <canvas height="600px" id="pflow-dev" width="1111px"></canvas>
+    <pre id="editor">function declaration({fn, cell, role}) {
+    let dx = 220;
+    let dy = 140;
+
+    let X = 'X';
+    let O = 'O';
+
+    function row (n) {
+        return [
+            cell(n+"0", 1, 1, { x: 1*dx, y: (n+1)*dy}),
+            cell(n+"1", 1, 1, { x: 2*dx, y: (n+1)*dy}),
+            cell(n+"2", 1, 1, { x: 3*dx, y: (n+1)*dy})
+        ];
+    }
+    let board = [ row(0), row(1), row(2) ];
+
+    let players =  {
+        X: {
+            turn: cell(X, 1, 1, { x: 40, y: 200 }), // track turns, X goes first
+            role: role(X), // player X can only mark X's
+            next: O,
+            dx: -60
+        },
+        O: {
+            turn: cell(O, 0, 1, { x: 830, y: 370}), // track turns, O moves second
+            role: role(O), // player O can only mark O's
+            next: X,
+            dx: 60
+        }
+    };
+
+    for (let i in  board) {
+        for (let j in  board[i]) {
+            for (let marking in players) {
+                player = players[marking];
+                let {position} = board[i][j].place; // use place for relative positioning
+                move = fn(marking+i+j, player.role, { // declare a move
+                    x: position.x+player.dx, // position using each player's unique delta
+                    y: position.y,
+                });
+                player.turn.tx(1, move); // take turn
+                board[i][j].tx(1, move); // take board space
+                move.tx(1, players[player.next].turn); // mark next turn
+            }
+        }
+    }
+}</pre>
+    <pre id="term"><a href="https://pflow.dev" id="termLink">pflow.dev</a> - petri-net editor</pre>
+</body>
+</html>

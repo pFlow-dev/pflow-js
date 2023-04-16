@@ -1,0 +1,32 @@
+{
+  "name": "@pflow-dev/pflow-js",
+  "version": "0.4.0",
+  "description": "build share-able petri-net models using an internal-js dsl and html5 canvas",
+  "main": "./src/pflow.js",
+  "files": [
+    "src/pflow.js",
+    "index.html"
+  ],
+  "directories": {
+    "test": "tests"
+  },
+  "scripts": {
+    "build": "babel src/pflow.js -o src/pflow.js",
+    "build:html": "node ./build.mjs && babel src/pflow.js -o src/pflow.js",
+    "test": "jest"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/pflow-dev/pflow-js"
+  },
+  "keywords": [
+    "petri-net"
+  ],
+  "author": "stackdump",
+  "license": "MIT",
+  "devDependencies": {
+    "@babel/preset-env": "^7.21.4",
+    "babel-cli": "^6.26.0",
+    "jest": "^29.5.0"
+  }
+}
