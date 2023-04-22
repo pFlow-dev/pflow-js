@@ -1,5 +1,4 @@
-import { newModel, modelSource, pflow2Html } from "../src/pflow.js"
-import { writeFileSync } from "fs"
+import { newModel, modelSource, pflow2html } from "../src/pflow.js"
 describe("metamodel", () => {
 
     it("should run test model", () => {
@@ -28,7 +27,7 @@ describe("metamodel", () => {
     });
 
     it("should generate html", () => {
-        const out = pflow2Html(modelSource.ticTacToe, { baseurl: "./src/"})
+        const out = pflow2html(modelSource.ticTacToe, { baseurl: "./src/"})
         expect(out.startsWith('<!DOCTYPE html>')).toBeTruthy()
     });
 

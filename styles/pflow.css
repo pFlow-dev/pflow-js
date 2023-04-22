@@ -1,0 +1,36 @@
+#editor {
+    height: 600px;
+    border: 1px solid black;
+    margin: 0;
+}
+#permalink {
+    color: black;
+    border-radius: 10px;
+    text-decoration: none;
+}
+#pflow-canvas {
+    float: right;
+    border: 1px solid black;
+    max-width: 100%;
+}
+.pflow-link {
+    color: #8bb4ccff;
+    text-decoration: none;
+}
+#term {
+    min-height: 280px;
+    padding: 10px;
+    margin: 0;
+}
+.btn {
+    border-radius: 10px;
+    border: 1px solid gray;
+    cursor: pointer;
+    margin-left: 3px;
+}
+#github-button {
+    border: 1px solid gray;
+    border-radius: 20px;
+    float: right;
+    margin-top: 5px;
+}
