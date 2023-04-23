@@ -1,6 +1,6 @@
 #editor {
     height: 600px;
-    border: 1px solid black;
+    border: 1px solid gray;
     margin: 0;
 }
 #permalink {
@@ -10,7 +10,7 @@
 }
 #pflow-canvas {
     float: right;
-    border: 1px solid black;
+    border: 1px solid gray;
     max-width: 100%;
 }
 .pflow-link {
@@ -33,4 +33,34 @@
     border-radius: 20px;
     float: right;
     margin-top: 5px;
+}
+#github-stars {
+    float: right;
+    margin-top: 12px;
+}
+#cdn-stats {
+    float: right;
+    margin-top: 5px;
+}
+
+ .tooltip {
+     position: relative;
+     display: inline-block;
+ }
+
+.tooltip .tooltiptext {
+    visibility: hidden;
+    width: 120px;
+    background-color: black;
+    color: #fff;
+    text-align: center;
+    padding: 5px 0;
+    border-radius: 6px;
+
+    position: absolute;
+    z-index: 1;
+}
+
+.tooltip:hover .tooltiptext {
+    visibility: visible;
 }

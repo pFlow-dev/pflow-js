@@ -11,7 +11,7 @@
     "test": "tests"
   },
   "scripts": {
-    "build": "babel src/pflow.js -o src/pflow.js && node -e \"require('./src/pflow.js').makeSandbox();\" ",
+    "build": "babel src/pflow.js -o src/pflow.js && node -e \"p=require('./src/pflow.js');p.makeSandbox();\" ",
     "test": "jest"
   },
   "repository": {

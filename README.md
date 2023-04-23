@@ -2,9 +2,15 @@
 
 [![](https://data.jsdelivr.com/v1/package/gh/pflow-dev/pflow-js/badge)](https://www.jsdelivr.com/package/gh/pflow-dev/pflow-js)
 
-Pflow-js provides an event-driven framework for coding with models.
+Pflow-js is an open-source (MIT) toolkit for coding peti-net models.
 
 Supports: Workflows, Petri-Nets, and State-Machines.
+
+
+## Status
+
+Beta - some known issues w/ canvas interaction & rendering
+
 
 ```js
 module.exports = {

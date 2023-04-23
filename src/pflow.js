@@ -680,6 +680,7 @@ function pflowSandbox(options = defaultPflowSandboxOptions) {
             }));
         });
         pflowDragAndDrop(s);
+
         updatePermaLink();
     }, options);
 }
@@ -690,6 +691,25 @@ const pflowStandardFunctionSignature = 'function declaration({fn, cell, role})';
 
 function isValidSource(source) {
     return source.startsWith(pflowStandardFunctionSignature);
+}
+
+function pflowTermDSL(editor, options) {
+
+    // convenience function to use relative positions in ace editor
+    const pos = (x, y) => {
+        return { x: options.marginX + x * 60, y: options.marginY + y * 60 };
+    };
+    const readModel = () => eval(editor.getValue() + pflowEvalModelSource(options));
+
+    const onSave = handler => {
+        editor.commands.addCommand({
+            name: "save",
+            bindKey: { win: "Ctrl-Enter", mac: "Command-Enter" },
+            exec: handler
+        });
+    };
+
+    return { onSave, readModel, pos };
 }
 
 /**
@@ -714,19 +734,7 @@ function pflowSandboxFactory(handler, options = defaultPflowSandboxOptions) {
         });
     }
 
-    // convenience function to use relative positions in ace editor
-    const pos = (x, y) => {
-        return { x: options.marginX + x * 60, y: options.marginY + y * 60 };
-    };
-    const readModel = () => eval(editor.getValue() + pflowEvalModelSource(options));
-
-    const onSave = handler => {
-        editor.commands.addCommand({
-            name: "save",
-            bindKey: { win: "Ctrl-Enter", mac: "Command-Enter" },
-            exec: handler
-        });
-    };
+    const { readModel, onSave } = pflowTermDSL(editor, options);
 
     const writeModel = source => {
         if (isValidSource(source)) {
@@ -752,7 +760,7 @@ function pflowSandboxFactory(handler, options = defaultPflowSandboxOptions) {
     }, {
         greetings: '',
         name: 'pflow.dev',
-        height: window ? window.innerHeight - 670 : 330,
+        height: 330,
         prompt: '> '
     });
 
@@ -789,7 +797,10 @@ function pflowSandboxFactory(handler, options = defaultPflowSandboxOptions) {
 /**
  * Default code sample is the model of a game of tic-tac-toe
  */
-const defaultCodeSample = `function declaration({fn, cell, role}) {
+const defaultCodeSample = `${pflowStandardFunctionSignature} {
+
+    // REVIEW: code in use at https://pflow.dev/demo/tictactoe/
+
     let dx = 220;
     let dy = 140;
 
@@ -893,10 +904,70 @@ const defaultSandboxOptions = {
     baseurl: "https://cdn.jsdelivr.net/gh/pFlow-dev/pflow-js@main"
 };
 
+function pflowJqueryExtensions() {
+    $.getQueryParams = function (str = window.location.search, separator = '&') {
+        const obj = {};
+        if (str.length === 0) return obj;
+        const c = str.substr(0, 1);
+        const s = c === '?' || c === '#' ? str.substr(1) : str;
+
+        const a = s.split(separator);
+        for (let i = 0; i < a.length; i++) {
+            const p = a[i].indexOf('=');
+            if (p < 0) {
+                obj[a[i]] = '';
+                continue;
+            }
+            let k = decodeURIComponent(a[i].substr(0, p)),
+                v = decodeURIComponent(a[i].substr(p + 1));
+
+            const bps = k.indexOf('[');
+            if (bps < 0) {
+                obj[k] = v;
+                continue;
+            }
+
+            const bpe = k.substr(bps + 1).indexOf(']');
+            if (bpe < 0) {
+                obj[k] = v;
+                continue;
+            }
+
+            const bpv = k.substr(bps + 1, bps + bpe - 1);
+            k = k.substr(0, bps);
+            if (bpv.length <= 0) {
+                if (typeof obj[k] != 'object') obj[k] = [];
+                obj[k].push(v);
+            } else {
+                if (typeof obj[k] != 'object') obj[k] = {};
+                obj[k][bpv] = v;
+            }
+        }
+        return obj;
+    };
+}
+
+function pflowToggleOption(id) {
+    console.log(id, 'toggle');
+    const option = $(id);
+    if (option.is(':visible')) {
+        option.hide();
+    } else {
+        option.show();
+    }
+}
+
 function runPflowSandbox() {
     const s = pflowSandbox();
     $('#simulate').click(evt => pflowToolbarHandler(s, evt));
     $('#download').click(evt => pflowToolbarHandler(s, evt));
+    $.urlParam = function (name) {
+        const results = new RegExp('[\?&]' + name + '=([^&#]*)').exec(window.location.search);
+        return results !== null ? results[1] || 0 : false;
+    };
+    pflowJqueryExtensions();
+    $('#viewCode').on('change', () => pflowToggleOption('#editor'));
+    $('#viewTerminal').on('change', () => pflowToggleOption('#term'));
 }
 
 const pflowGithubLink = `<div>
@@ -910,10 +981,21 @@ const pflowGithubLink = `<div>
             </g>
             <text id="github-name" x="30" y="20">@pFlow-dev/pflow-js</text>
         </g>
-        </svg>
+        </svg>GithubStars
     </a>
     </button>
 </div>`;
+
+const pflowStats = `<table id="cdn-stats">
+<tr><td>
+<a href="https://www.jsdelivr.com/package/gh/pflow-dev/pflow-js" rel="nofollow noopener noreferrer" class="router-ignore"><img alt="" src="https://data.jsdelivr.com/v1/package/gh/pflow-dev/pflow-js/badge" loading="lazy"></a>
+</td><td>
+&nbsp;&nbsp;&nbsp;
+</td><td>
+<iframe src="https://ghbtns.com/github-btn.html?user=pFlow-dev&repo=pflow-js&type=star&count=true&size=large" frameborder="0" scrolling="0" width="130" height="40" title="GitHub">
+</iframe>
+</td></tr>
+</table>`;
 
 const pflowToolbar = `<table id="heading">
 <tr><td>
@@ -923,9 +1005,16 @@ const pflowToolbar = `<table id="heading">
     </path></g>
     </svg></a>
 </td><td>
-    <button id="simulate" class="btn">Simulate</button>
+    <div class="tooltip">
+        <button id="simulate" class="btn"> Simulate</button>
+        <span class="tooltiptext">Atl+Enter/Save to Run from Editor</span>
+    </div>
     <button id="download" class="btn">Download</button>
-    <button id="share" class="btn"><a id="permalink" href="#">Permalink</a></button>
+    <button id="share" class="btn"><a id="permalink" target=_blank >Permalink</a></button>
+    <button id="embed" class="btn"><a id="embed" target=_blank >Embed</a></button>
+</td><td>
+    <input type="checkbox" id="viewCode" class="feature-flag" checked>Code</input>
+    <input type="checkbox" id="viewTerminal" class="feature-flag" checked>Terminal</input>
 </td></tr>
 </table>`;
 
@@ -938,14 +1027,16 @@ async function pflowToolbarHandler(s, { target }) {
             break;
         case 'download':
             s.echo("download." + Date.now());
-            const source = s.getValue();
-            downloadZippedSource(source);
+            downloadZippedSource(s.getValue());
+            break;
+        case 'embed':
+            s.echo("embed." + Date.now());
             break;
     }
 }
 
 /**
- * pflow@Html can be used from the browser or nodejs
+ * pflow@html can be used from the browser or nodejs
  * ```js
  * require("fs");
  * const p = require('./pflow.js');
@@ -970,9 +1061,9 @@ const pflow2html = (sourceCode, opts = defaultSandboxOptions) => `<!DOCTYPE html
     <script src="${opts.baseurl}/src/pflow.js"></script>
 </head>
 <body onload=(runPflowSandbox())>
-${pflowGithubLink}
+${pflowStats}
 ${pflowToolbar}
-<canvas height="600px" id="pflow-canvas" width="1116px"></canvas>
+<canvas id="pflow-canvas" height="600px" width="1116px"></canvas>
 <pre id="editor">${sourceCode}</pre>
 <pre id="term"><a class="pflow-link" target="_blank" href="https://pflow.dev/about">pflow.dev petri-net editor</a></pre>
 </body>
@@ -988,6 +1079,10 @@ ${pflowToolbar}
  * @param opts - template options
  */
 if (typeof module !== 'undefined') {
+
+    function makeWidget(source, opts = {}) {
+        // build widget template
+    }
     function makeSandbox(source = defaultCodeSample, opts = {}) {
         const baseurl = opts.baseurl || '.';
         require("fs").writeFileSync('index.html', pflow2html(source, { baseurl }));
@@ -999,6 +1094,8 @@ if (typeof module !== 'undefined') {
         newSandbox: pflowSandbox,
         newStream: pflowStream,
         newModel: pflowModel,
+        unzip: pflowUnzip,
+        zip: pflowZip,
         pflow2html,
         pflow2png,
         pflow2svg,
