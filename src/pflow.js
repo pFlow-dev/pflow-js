@@ -57,7 +57,6 @@ class PFlowStream {
             fail: (s, evt) => eventHandlers.get("__onFail__")(s, evt),
             onEvery: handler => eventHandlers.set("__onEvery__", handler),
             update: model => {
-                console.log({ model }, 'update', model.def.schema);
                 this.models.set(model.def.schema, model);
             },
             reload: schema => {
@@ -65,6 +64,7 @@ class PFlowStream {
             }
         };
         this.dispatch = this.dispatch.bind(this);
+        this.restart = this.restart.bind(this);
     }
 
     dispatch(evt) {
@@ -459,11 +459,16 @@ function pflow2png({ canvasId, declaration, handler, state: inputState }) {
     const m = pflowModel({ schema, type: PFlowModel.petriNet, declaration });
     const s = pflowStream({ models: [m] });
     const { on } = s.dispatcher;
-
+    const size = { width: 1116, height: 600 }; // hardcoded SVG size
     s.canvas = document.getElementById(canvasId);
+
     s.canvas.addEventListener('click', ({ offsetX: x, offsetY: y }) => {
-        const n = m.getNearbyNode(x, y); // FIXME: account for canvas scale
-        if (Object.hasOwn(n, 'transition')) {
+        const scaled = {
+            x: x * (size.width/s.canvas.clientWidth),
+            y: y * (size.height/s.canvas.clientHeight)
+        };
+        const n = s.models.get(schema).getNearbyNode(scaled.x, scaled.y);
+        if (n && Object.hasOwn(n, 'transition')) {
             const { label: action } = n.transition;
             s.dispatch({ schema, action, multiple: 1 });
         }
@@ -488,7 +493,7 @@ function pflow2png({ canvasId, declaration, handler, state: inputState }) {
     }
 
     on("__onReload__", (s, evt) => {
-        drawPng(); // KLUDGE: doesn't allow switching between schemas
+        drawPng();
     });
     s.dispatcher.reload(schema);
     return s;
@@ -502,18 +507,21 @@ function pflow2png({ canvasId, declaration, handler, state: inputState }) {
  * @returns {string}
  */
 function pflow2svg(model, options = {}) {
+
+    const state = options.state || model.initialVector();
+
     const tokenTemplate = ({ p, tokens }) => {
         if (tokens === 0) {
             return; // don't show zeros
         }
         if (tokens === 1) {
-            return `<circle cx="${p.x}" cy="${p.y}" r="2" fill="black" stroke="black" />`;
+            return `<circle cx="${p.position.x}" cy="${p.position.y}" r="2" fill="black" stroke="black" />`;
         }
         if (tokens < 10) {
             return `<text x="${p.position.x - 4}" y="${p.position.y + 5}">${tokens}</text>`;
         }
         if (tokens >= 10) {
-            return `<text  x="${p.x - 7}" y="${p.y + 5}">${tokens}</text>`;
+            return `<text  x="${p.position.x - 7}" y="${p.position.y + 5}">${tokens}</text>`;
         }
     };
     const arcTemplate = ({
@@ -536,7 +544,7 @@ function pflow2svg(model, options = {}) {
     }) => `<rect width="30" height="30" fill="${fill}" stroke="${stroke}" rx="${4}" x="${t.position.x - 15}" y="${t.position.y - 15}" />` + `<text font-size="smaller" x="${t.position.x - 15}" y="${t.position.y - 20}" >${t.label}</text>`;
     const placeTemplate = ({ p }) => `<circle cx="${p.position.x}" cy="${p.position.y}" r="16" fill="white" stroke="black"  />` + `${tokenTemplate({
         p,
-        tokens: p.initial
+        tokens: state[p.offset]
     })}` + `<text font-size="smaller" x="${p.position.x - 18}" y="${p.position.y - 20}" >${p.label}</text>`;
     const template = ({
         page,
@@ -575,8 +583,26 @@ function pflow2svg(model, options = {}) {
     const page = model.getSize();
     let transitionTags = '';
     for (const i in transitions) {
+        const { ok } = model.testFire({
+            state, action: transitions[i].label, multiple: 1
+        });
+        const { ok: guardFails } = model.guardFails({
+            state, action: transitions[i].label, multiple: 1
+        });
+
+        const hasGuard = Object.keys(transitions[i].guards).length > 0;
+
+        let fill = "white";
+        if (ok) {
+            fill = "#62fa75";
+        } else if (hasGuard && guardFails) {
+            fill = "#fab5b0";
+        }
+
+        // test to see if guards are inhibiting = red
+        // and if transition is fire-able = green
         transitionTags += transitionTemplate({
-            fill: "white",
+            fill, // TODO: color by state
             stroke: "black",
             t: transitions[i]
         });
@@ -606,7 +632,6 @@ function pflow2svg(model, options = {}) {
             });
         }
     }
-    // TODO: support snapshot while running
     for (const txn in transitions) {
         for (const i in transitions[txn].delta) {
             const v = transitions[txn].delta[i];
@@ -654,7 +679,7 @@ const defaultPflowSandboxOptions = {
 
 /**
  * pflowSandbox requires JQuery and Ace editor to be present in browser
- * XXX this makes use of eval() do not use in production applications XXX
+ * XXX this makes use of eval() do not use outside of sandbox applications XXX
  */
 function pflowSandbox(options = defaultPflowSandboxOptions) {
     return pflowSandboxFactory(s => {
@@ -680,13 +705,13 @@ function pflowSandbox(options = defaultPflowSandboxOptions) {
             }));
         });
         pflowDragAndDrop(s);
-
         updatePermaLink();
     }, options);
 }
 
 const pflowEvalModelSource = options => `;;;pflowModel({ schema: '${options.canvasId}', declaration, type: PFlowModel.petriNet })`;
 
+// REVIEW: possibly support different function signatures for each type of model
 const pflowStandardFunctionSignature = 'function declaration({fn, cell, role})';
 
 function isValidSource(source) {
@@ -699,7 +724,9 @@ function pflowTermDSL(editor, options) {
     const pos = (x, y) => {
         return { x: options.marginX + x * 60, y: options.marginY + y * 60 };
     };
-    const readModel = () => eval(editor.getValue() + pflowEvalModelSource(options));
+    const readModel = () => {
+        return eval(editor.getValue() + pflowEvalModelSource(options));
+    };
 
     const onSave = handler => {
         editor.commands.addCommand({
@@ -714,7 +741,7 @@ function pflowTermDSL(editor, options) {
 
 /**
  * pflowSandboxFactory requires JQuery and Ace editor to be present in browser
- * XXX this makes use of eval() do not use in production applications XXX
+ * XXX this makes use of eval() do not use outside of sandbox applications XXX
  *
  * @param handler callback function used initialize event bindings
  * @param options editor config options
@@ -760,7 +787,7 @@ function pflowSandboxFactory(handler, options = defaultPflowSandboxOptions) {
     }, {
         greetings: '',
         name: 'pflow.dev',
-        height: 330,
+        height: 390,
         prompt: '> '
     });
 
@@ -862,6 +889,7 @@ function pflowDragAndDrop(s) {
                     s.setValue(source);
                     s.update(s.readModel());
                     s.clear();
+                    s.restart();
                     s.reload(s.schema);
                     s.echo("imported.");
                 } else {
@@ -891,6 +919,15 @@ function downloadZippedSource(source) {
 
 // requires JSZip
 function pflowZip(source) {
+    if (window !== undefined) {
+        // ideal is to say within one std IPFS chunk
+        const kbSize = new TextEncoder().encode(source).length / 1024;
+        if (kbSize > 256) {
+            alert('source code limit is 256 kb');
+            console.error('source code limit is 256 kb');
+            return;
+        }
+    }
     const zip = new JSZip();
     zip.file("declaration.js", source);
     return zip.generateAsync({
@@ -904,51 +941,48 @@ const defaultSandboxOptions = {
     baseurl: "https://cdn.jsdelivr.net/gh/pFlow-dev/pflow-js@main"
 };
 
-function pflowJqueryExtensions() {
-    $.getQueryParams = function (str = window.location.search, separator = '&') {
-        const obj = {};
-        if (str.length === 0) return obj;
-        const c = str.substr(0, 1);
-        const s = c === '?' || c === '#' ? str.substr(1) : str;
+async function getQueryParams(str = window.location.search, separator = '&') {
+    const obj = {};
+    if (str.length === 0) return obj;
+    const c = str.substr(0, 1);
+    const s = c === '?' || c === '#' ? str.substr(1) : str;
 
-        const a = s.split(separator);
-        for (let i = 0; i < a.length; i++) {
-            const p = a[i].indexOf('=');
-            if (p < 0) {
-                obj[a[i]] = '';
-                continue;
-            }
-            let k = decodeURIComponent(a[i].substr(0, p)),
-                v = decodeURIComponent(a[i].substr(p + 1));
-
-            const bps = k.indexOf('[');
-            if (bps < 0) {
-                obj[k] = v;
-                continue;
-            }
-
-            const bpe = k.substr(bps + 1).indexOf(']');
-            if (bpe < 0) {
-                obj[k] = v;
-                continue;
-            }
-
-            const bpv = k.substr(bps + 1, bps + bpe - 1);
-            k = k.substr(0, bps);
-            if (bpv.length <= 0) {
-                if (typeof obj[k] != 'object') obj[k] = [];
-                obj[k].push(v);
-            } else {
-                if (typeof obj[k] != 'object') obj[k] = {};
-                obj[k][bpv] = v;
-            }
+    const a = s.split(separator);
+    for (let i = 0; i < a.length; i++) {
+        const p = a[i].indexOf('=');
+        if (p < 0) {
+            obj[a[i]] = '';
+            continue;
         }
-        return obj;
-    };
+        let k = decodeURIComponent(a[i].substr(0, p)),
+            v = decodeURIComponent(a[i].substr(p + 1));
+
+        const bps = k.indexOf('[');
+        if (bps < 0) {
+            obj[k] = v;
+            continue;
+        }
+
+        const bpe = k.substr(bps + 1).indexOf(']');
+        if (bpe < 0) {
+            obj[k] = v;
+            continue;
+        }
+
+        const bpv = k.substr(bps + 1, bps + bpe - 1);
+        k = k.substr(0, bps);
+        if (bpv.length <= 0) {
+            if (typeof obj[k] != 'object') obj[k] = [];
+            obj[k].push(v);
+        } else {
+            if (typeof obj[k] != 'object') obj[k] = {};
+            obj[k][bpv] = v;
+        }
+    }
+    return obj;
 }
 
 function pflowToggleOption(id) {
-    console.log(id, 'toggle');
     const option = $(id);
     if (option.is(':visible')) {
         option.hide();
@@ -957,17 +991,36 @@ function pflowToggleOption(id) {
     }
 }
 
-function runPflowSandbox() {
+async function runPflowSandbox() {
     const s = pflowSandbox();
     $('#simulate').click(evt => pflowToolbarHandler(s, evt));
     $('#download').click(evt => pflowToolbarHandler(s, evt));
-    $.urlParam = function (name) {
+    $('#embed').click(evt => pflowToolbarHandler(s, evt));
+    $.urlParam = function (name) { // REVIEW: do we really want this?
         const results = new RegExp('[\?&]' + name + '=([^&#]*)').exec(window.location.search);
         return results !== null ? results[1] || 0 : false;
     };
-    pflowJqueryExtensions();
     $('#viewCode').on('change', () => pflowToggleOption('#editor'));
     $('#viewTerminal').on('change', () => pflowToggleOption('#term'));
+    $('#permalink').click(evt => {
+        evt.stopPropagation();
+        evt.preventDefault();
+        pflowToolbarHandler(s, evt);
+        return false;
+    });
+    return getQueryParams().then(async params => {
+        if (params.z) {
+            // REVIEW: could have a max limit here too
+            const kbSize = new TextEncoder().encode(params.z).length / 1024;
+            console.log({ kbSize }, 'loading zipped source');
+            const source = await pflowUnzip(params.z);
+            s.setValue(source);
+            s.update(s.readModel());
+            s.clear();
+            s.reload(s.schema);
+            s.echo("imported.");
+        }
+    });
 }
 
 const pflowGithubLink = `<div>
@@ -1005,35 +1058,96 @@ const pflowToolbar = `<table id="heading">
     </path></g>
     </svg></a>
 </td><td>
-    <div class="tooltip">
-        <button id="simulate" class="btn"> Simulate</button>
-        <span class="tooltiptext">Atl+Enter/Save to Run from Editor</span>
-    </div>
-    <button id="download" class="btn">Download</button>
-    <button id="share" class="btn"><a id="permalink" target=_blank >Permalink</a></button>
-    <button id="embed" class="btn"><a id="embed" target=_blank >Embed</a></button>
+   <div class="tooltip">
+       <button id="simulate" class="btn">
+           <svg width="12" height="14">
+           <g transform="translate(-2,0) scale(.7,.7)">
+           <path d="M8 5v14l11-7z"></path>
+           </g>
+           </svg>
+       Simulate</button>
+       <span class="tooltiptext">{Atl+Enter} to run model</span>
+   </div>
+  <div class="tooltip">
+   <button id="download" class="btn">
+       <svg width="12" height="14">
+       <g transform="translate(-2,0) scale(.66,.66)">
+       <path d="M5 20h14v-2H5v2zM19 9h-4V3H9v6H5l7 7 7-7z"></path>
+       </g>
+       </svg> Download</button>
+     <span class="tooltiptext">download.zip</span>
+   </div>
+  <div class="tooltip">
+  <a id="permalink" target=_blank >
+  <button id="share" class="btn">
+     <svg width="18" height="14">
+     <g transform="scale(.8,.8)">
+     <path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"></path>
+     </g>
+     </svg> Link
+     </button>
+     </a>
+     <span class="tooltiptext">copy link to clipboard</span>
+  </div>
+  <div class="tooltip">
+  <button id="embed" class="btn">
+     <svg width="18" height="14">
+     <g transform="translate(2,0) scale(.6,.6)">
+     <path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92 1.61 0 2.92-1.31 2.92-2.92s-1.31-2.92-2.92-2.92z"></path>
+     </g>
+     </svg> Embed</button>
+     <span class="tooltiptext">copy iframe widget source</span>
+  </div>
 </td><td>
     <input type="checkbox" id="viewCode" class="feature-flag" checked>Code</input>
     <input type="checkbox" id="viewTerminal" class="feature-flag" checked>Terminal</input>
 </td></tr>
 </table>`;
 
-async function pflowToolbarHandler(s, { target }) {
-    switch (target.id) {
+async function pflowToolbarHandler(s, evt) {
+    switch (evt.target.id) {
         case 'simulate':
             s.clear();
+            s.restart();
             s.reload(s.schema);
             s.echo("restarted." + Date.now());
             break;
         case 'download':
             s.echo("download." + Date.now());
-            downloadZippedSource(s.getValue());
-            break;
+            return downloadZippedSource(s.getValue());
         case 'embed':
             s.echo("embed." + Date.now());
-            break;
+            return pflowZip(s.getValue()).then(data => {
+                navigator.clipboard.writeText(pflowWidgetTemplate(data));
+            });
+        case 'permalink':
+            s.echo("link." + Date.now());
+            return navigator.clipboard.writeText(evt.target.href);
     }
 }
+
+const pflowWidgetTemplate = (sourceCode, opts = defaultSandboxOptions) => `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>pflow.dev</title>
+    <meta charset="utf-8"/>
+    <meta name="description" content="open source petri-net editor pflow.dev"/>
+    <meta name="keywords" content="pflow, petri-net, sandbox"/>
+    <style>
+        body {
+            margin: auto;
+            max-width: 1000px;
+        }
+        iframe {
+            border : 0;
+        }
+    </style>
+</head>
+<body>
+<iframe id="pflow-model" width="1000" height="1550" src="https://pflow.dev/index.html?o[]=vi&o[]=term&o[]=editor&x=${sourceCode}">
+</iframe>
+</body>
+</html>`;
 
 /**
  * pflow@html can be used from the browser or nodejs
@@ -1069,25 +1183,7 @@ ${pflowToolbar}
 </body>
 </html>`;
 
-/**
- * sandbox is generated from nodejs
- * and will write the code sample to a new index.html pflow editor
- * ```js
- * require('./src/pflow.js').makeSandbox();
- * ```
- * @param source - javascript source code for a pflow model
- * @param opts - template options
- */
 if (typeof module !== 'undefined') {
-
-    function makeWidget(source, opts = {}) {
-        // build widget template
-    }
-    function makeSandbox(source = defaultCodeSample, opts = {}) {
-        const baseurl = opts.baseurl || '.';
-        require("fs").writeFileSync('index.html', pflow2html(source, { baseurl }));
-        return 'wrote index.html';
-    }
 
     module.exports = {
         ModelType: PFlowModel,
@@ -1099,7 +1195,6 @@ if (typeof module !== 'undefined') {
         pflow2html,
         pflow2png,
         pflow2svg,
-        modelSource: { ticTacToe: defaultCodeSample },
-        makeSandbox
+        modelSource: { ticTacToe: defaultCodeSample }
     };
 }
