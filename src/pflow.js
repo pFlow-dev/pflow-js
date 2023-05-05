@@ -464,8 +464,8 @@ function pflow2png({ canvasId, declaration, handler, state: inputState }) {
 
     s.canvas.addEventListener('click', ({ offsetX: x, offsetY: y }) => {
         const scaled = {
-            x: x * (size.width/s.canvas.clientWidth),
-            y: y * (size.height/s.canvas.clientHeight)
+            x: x * (size.width / s.canvas.clientWidth),
+            y: y * (size.height / s.canvas.clientHeight)
         };
         const n = s.models.get(schema).getNearbyNode(scaled.x, scaled.y);
         if (n && Object.hasOwn(n, 'transition')) {
@@ -996,7 +996,8 @@ async function runPflowSandbox() {
     $('#simulate').click(evt => pflowToolbarHandler(s, evt));
     $('#download').click(evt => pflowToolbarHandler(s, evt));
     $('#embed').click(evt => pflowToolbarHandler(s, evt));
-    $.urlParam = function (name) { // REVIEW: do we really want this?
+    $.urlParam = function (name) {
+        // REVIEW: do we really want this?
         const results = new RegExp('[\?&]' + name + '=([^&#]*)').exec(window.location.search);
         return results !== null ? results[1] || 0 : false;
     };
