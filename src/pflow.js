@@ -674,7 +674,7 @@ const defaultPflowSandboxOptions = {
     marginX: 0,
     marginY: 0,
     canvasId: 'pflow-canvas',
-    vim: true
+    vim: false // don't use vim mode by default
 };
 
 /**
@@ -685,7 +685,7 @@ function pflowSandbox(options = defaultPflowSandboxOptions) {
     return pflowSandboxFactory(s => {
         const updatePermaLink = () => {
             pflowZip(s.getValue()).then(data => {
-                $('#permalink').attr('href', `https://pflow.dev/?z=${data}`);
+                $('#share').attr('href', `https://pflow.dev/?z=${data}`);
             });
         };
         s.onSave(() => {
@@ -993,9 +993,9 @@ function pflowToggleOption(id) {
 
 async function runPflowSandbox() {
     const s = pflowSandbox();
-    $('#simulate').click(evt => pflowToolbarHandler(s, evt));
-    $('#download').click(evt => pflowToolbarHandler(s, evt));
-    $('#embed').click(evt => pflowToolbarHandler(s, evt));
+    $('#simulate').on('click', evt => pflowToolbarHandler(s, evt));
+    $('#download').on('click', evt => pflowToolbarHandler(s, evt));
+    $('#embed').on('click', evt => pflowToolbarHandler(s, evt));
     $.urlParam = function (name) {
         // REVIEW: do we really want this?
         const results = new RegExp('[\?&]' + name + '=([^&#]*)').exec(window.location.search);
@@ -1003,10 +1003,8 @@ async function runPflowSandbox() {
     };
     $('#viewCode').on('change', () => pflowToggleOption('#editor'));
     $('#viewTerminal').on('change', () => pflowToggleOption('#term'));
-    $('#permalink').click(evt => {
-        evt.stopPropagation();
-        evt.preventDefault();
-        pflowToolbarHandler(s, evt);
+    $('#share').on('click', evt => {
+        pflowToolbarHandler(s, { target: { id: 'share' } });
         return false;
     });
     return getQueryParams().then(async params => {
@@ -1067,7 +1065,7 @@ const pflowToolbar = `<table id="heading">
            </g>
            </svg>
        Simulate</button>
-       <span class="tooltiptext">{Atl+Enter} to run model</span>
+       <span class="tooltiptext">{Alt+Enter} to run model</span>
    </div>
   <div class="tooltip">
    <button id="download" class="btn">
@@ -1079,8 +1077,8 @@ const pflowToolbar = `<table id="heading">
      <span class="tooltiptext">download.zip</span>
    </div>
   <div class="tooltip">
-  <a id="permalink" target=_blank >
-  <button id="share" class="btn">
+  <a id="share" target=_blank >
+  <button id="permalink" class="btn">
      <svg width="18" height="14">
      <g transform="scale(.8,.8)">
      <path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"></path>
@@ -1099,6 +1097,14 @@ const pflowToolbar = `<table id="heading">
      </svg> Embed</button>
      <span class="tooltiptext">copy iframe widget source</span>
   </div>
+  <a href="https://pflow.dev/help" target="_blank">
+  <button id="help" class="btn">
+     <svg width="18" height="14">
+     <g transform="translate(0,1) scale(.6,.6)">
+      <path d="M11 18h2v-2h-2v2zm1-16C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm0-14c-2.21 0-4 1.79-4 4h2c0-1.1.9-2 2-2s2 .9 2 2c0 2-3 1.75-3 5h2c0-2.25 3-2.5 3-5 0-2.21-1.79-4-4-4z"></path>
+     </g>
+     </svg>Help</button>
+</a>
 </td><td>
     <input type="checkbox" id="viewCode" class="feature-flag" checked>Code</input>
     <input type="checkbox" id="viewTerminal" class="feature-flag" checked>Terminal</input>
@@ -1121,9 +1127,9 @@ async function pflowToolbarHandler(s, evt) {
             return pflowZip(s.getValue()).then(data => {
                 navigator.clipboard.writeText(pflowWidgetTemplate(data));
             });
-        case 'permalink':
+        case 'share':
             s.echo("link." + Date.now());
-            return navigator.clipboard.writeText(evt.target.href);
+            return navigator.clipboard.writeText($("#share").attr('href'));
     }
 }
 
