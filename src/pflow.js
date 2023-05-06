@@ -1065,7 +1065,7 @@ const pflowToolbar = `<table id="heading">
            </g>
            </svg>
        Simulate</button>
-       <span class="tooltiptext">{Alt+Enter} to run model</span>
+       <span class="tooltiptext">{Ctl+Enter} to run model</span>
    </div>
   <div class="tooltip">
    <button id="download" class="btn">
