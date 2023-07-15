@@ -9,7 +9,7 @@ Supports: Workflows, Petri-Nets, and State-Machines.
 
 ## Status
 
-Beta - some known issues w/ canvas interaction & rendering
+Stable - no known issues
 
 
 ```js
