@@ -364,7 +364,6 @@ function pflowModel({ schema, declaration, type }) {
     if (typeof declaration === 'object') {
         def.places = declaration.places;
         def.transitions = declaration.transitions;
-        // TODO: should re-populate the arc defs
     }
 
     function isClose(a, b) {
@@ -454,6 +453,7 @@ function pflowModel({ schema, declaration, type }) {
  * @returns {{state: Map<any, any>, history: [], seq: number, models: Map<any, any>, dispatch(*): *, restart(): void}}
  */
 function pflow2png({ canvasId, declaration, handler, state: inputState }) {
+    // TODO: use inputState
     const schema = canvasId;
     const domURL = window.URL || window.webkitURL || window;
     const m = pflowModel({ schema, type: PFlowModel.petriNet, declaration });
@@ -487,12 +487,14 @@ function pflow2png({ canvasId, declaration, handler, state: inputState }) {
         img.src = domURL.createObjectURL(svgBlob);
         img.onload = function () {
             ctx.clearRect(0, 0, s.canvas.width, s.canvas.height);
+            ctx.fillStyle = "white";
+            ctx.fillRect(0, 0, s.canvas.width, s.canvas.height);
             ctx.drawImage(img, 0, 0);
             domURL.revokeObjectURL(img.src);
         };
     }
 
-    on("__onReload__", (s, evt) => {
+    on("__onReload__", () => {
         drawPng();
     });
     s.dispatcher.reload(schema);
@@ -594,15 +596,13 @@ function pflow2svg(model, options = {}) {
 
         let fill = "white";
         if (ok) {
-            fill = "#62fa75";
+            fill = "#62fa75"; // green
         } else if (hasGuard && guardFails) {
-            fill = "#fab5b0";
+            fill = "#fab5b0"; // red
         }
 
-        // test to see if guards are inhibiting = red
-        // and if transition is fire-able = green
         transitionTags += transitionTemplate({
-            fill, // TODO: color by state
+            fill,
             stroke: "black",
             t: transitions[i]
         });
@@ -685,7 +685,9 @@ function pflowSandbox(options = defaultPflowSandboxOptions) {
     return pflowSandboxFactory(s => {
         const updatePermaLink = () => {
             pflowZip(s.getValue()).then(data => {
-                $('#share').attr('href', `https://pflow.dev/?z=${data}`);
+                // get current URL with no params
+                const url = window.location.href.split('?')[0];
+                $('#share').attr('href', `${url}?z=${data}`);
             });
         };
         s.onSave(() => {
@@ -754,7 +756,7 @@ function pflowSandboxFactory(handler, options = defaultPflowSandboxOptions) {
         editor.setKeyboardHandler("ace/keyboard/vim");
 
         ace.config.loadModule("ace/keyboard/vim", function () {
-            var VimApi = ace.require("ace/keyboard/vim").CodeMirror.Vim;
+            const VimApi = ace.require("ace/keyboard/vim").CodeMirror.Vim;
             VimApi.defineEx("write", "w", function (cm, input) {
                 cm.ace.execCommand("save");
             });
@@ -1003,7 +1005,7 @@ async function runPflowSandbox() {
     };
     $('#viewCode').on('change', () => pflowToggleOption('#editor'));
     $('#viewTerminal').on('change', () => pflowToggleOption('#term'));
-    $('#share').on('click', evt => {
+    $('#share').on('click', () => {
         pflowToolbarHandler(s, { target: { id: 'share' } });
         return false;
     });
@@ -1051,11 +1053,9 @@ const pflowStats = `<table id="cdn-stats">
 
 const pflowToolbar = `<table id="heading">
 <tr><td>
-    <a class="pflow-link" target="_blank" href="https://pflow.dev/about">
-    <svg id="logo-header" width="45" height="45"><g transform="translate(0,0) scale(1,1)">
-    <path fill="#8bb4ccff" d="M24.231 4.526A19.931 19.487 0 0 0 4.3 24.014a19.931 19.487 0 0 0 8.838 16.181l-.714-27.836 4.52-.076.058 2.394c.42-.358.329-.673 2.614-1.88 1.432-.709 3.742-.967 5.745-1.001 3.323-.058 6.362.767 8.49 3.039 2.144 2.272 3.264 5.287 3.36 9.048.097 3.76-.868 6.813-2.894 9.157-2.009 2.343-4.673 3.545-7.996 3.602-2.004.035-3.742-.286-5.21-.96-1.45-.658-3.707-2.113-3.645-2.695l.102 9.367a19.931 19.487 0 0 0 6.663 1.147 19.931 19.487 0 0 0 19.93-19.487 19.931 19.487 0 0 0-19.93-19.488Zm.427 10.295c-2.378.04-4.228.893-5.554 2.555-1.31 1.676-1.925 3.957-1.851 6.849.074 2.892.98 5.148 2.374 6.763.64.583 1.281 1.06 1.935 1.452v-7.312H19.53v-1.392h2.03v-.758c0-1.214.333-2.097 1.003-2.648.669-.558 1.732-.839 3.185-.839h2.006v1.491h-2.03c-.762 0-1.292.13-1.592.39-.292.26-.44.726-.44 1.4v.964h3.496v1.392h-3.495v8.224a7.613 7.613 0 0 0 2.486.217c1.856-.07 3.841-.9 5.15-2.576 1.327-1.662 2.02-4.165 1.946-7.057-.074-2.892-.92-5.267-2.331-6.896-1.394-1.615-3.908-2.26-6.287-2.219zm.447 11.137h.378v3.072h-.378zm2.06.806c.328 0 .586.102.774.307.187.206.28.49.28.855 0 .362-.093.647-.28.854-.188.205-.446.308-.775.308-.33 0-.588-.103-.776-.308-.186-.207-.277-.492-.277-.854 0-.364.091-.65.277-.855.188-.205.447-.307.776-.307zm1.459.055H29l.474 1.726.47-1.726h.446l.47 1.726.47-1.726h.379l-.602 2.211h-.445l-.494-1.813-.499 1.813h-.443zm-1.46.252a.575.575 0 0 0-.48.23c-.118.152-.178.36-.178.625 0 .264.058.473.174.626.118.151.28.228.484.228a.573.573 0 0 0 .48-.23c.117-.153.174-.361.174-.624s-.057-.469-.175-.621a.573.573 0 0 0-.479-.234z">
-    </path></g>
-    </svg></a>
+    <a class="pflow-link" target="_blank" href="">
+    <svg id="logo-header" width="45" height="45" xmlns="http://www.w3.org/2000/svg" xml:space="preserve" style="enable-background:new 0 0 194.9 47.8" viewBox="0 0 47.8 47.8"><path d="M24.57 35.794c.177-.033.433-.032.57.002.135.035-.01.062-.322.06-.313 0-.424-.03-.247-.062zM11.585 28.84c0-1.102.022-1.553.05-1.002.026.551.026 1.454 0 2.005-.028.551-.05.1-.05-1.003zM4.05 23.932c0-1.064.023-1.481.05-.927.027.555.027 1.426 0 1.936-.028.51-.05.056-.05-1.009zm2.965-2.79a1.2 1.2 0 0 1 .497 0c.137.034.025.062-.249.062-.273 0-.385-.028-.248-.063zm7.924-5.479c0-.024.208-.226.462-.45l.462-.405-.418.449c-.389.419-.506.513-.506.406zm-4.406-5.418c.265-.266.514-.484.553-.484.039 0-.146.218-.411.484s-.514.484-.554.484c-.039 0 .146-.218.412-.484z" style="fill:#d0d0d0;fill-opacity:1;stroke-width:.140185" transform="matrix(1.05551 0 0 1.0735 -1.74 -1.355)"/><path d="M11.563 26.421c.002-.304.031-.412.065-.24s.033.42-.003.553c-.035.132-.063-.009-.062-.313zm16.618-2.42c0-.19.032-.267.071-.172a.52.52 0 0 1 0 .345c-.04.095-.071.018-.071-.172zm-12.745-8.018c.142-.152.29-.277.329-.277.039 0-.045.125-.186.277-.142.152-.29.276-.329.276-.039 0 .045-.124.186-.276zm9.135-4.107c.176-.034.432-.032.568.002.136.035-.009.062-.321.06-.313-.001-.424-.03-.247-.062z" style="fill:#b9b9b9;fill-opacity:1;stroke-width:.140185" transform="matrix(1.05551 0 0 1.0735 -1.74 -1.355)"/><path d="M11.55 25.66c0-.19.032-.267.072-.172a.52.52 0 0 1 0 .345c-.04.095-.072.018-.072-.172zm25.74-1.728c.003-.304.032-.412.066-.24s.032.42-.003.553c-.036.132-.064-.008-.062-.313zm-29.2-2.79c.102-.04.225-.035.272.01.047.047-.037.08-.187.074-.165-.007-.199-.04-.085-.084z" style="fill:#a3a3a3;fill-opacity:1;stroke-width:.140185" transform="matrix(1.05551 0 0 1.0735 -1.74 -1.355)"/><path d="m9.804 37.309-.195-.242.248.19c.137.104.25.213.25.241 0 .114-.118.04-.303-.19zm1.746-12.201c0-.19.032-.268.072-.173a.52.52 0 0 1 0 .345c-.04.095-.072.018-.072-.172zm-3.034-3.966c.103-.04.225-.035.272.01.048.047-.036.08-.186.074-.166-.007-.2-.04-.086-.084z" style="fill:#8c8c8c;fill-opacity:1;stroke-width:.140185" transform="matrix(1.05551 0 0 1.0735 -1.74 -1.355)"/><path d="M19.226 40.592c0-.19.032-.268.071-.173a.52.52 0 0 1 0 .346c-.04.095-.071.017-.071-.173z" style="fill:#767676;fill-opacity:1;stroke-width:.140185" transform="matrix(1.05551 0 0 1.0735 -1.74 -1.355)"/><path d="M19.214 41.065c.007-.162.04-.194.086-.084.041.1.036.219-.01.265-.048.046-.082-.036-.076-.181zm.028-1.302c0-.343.028-.483.062-.311.033.17.033.45 0 .622-.034.17-.062.03-.062-.311zM44.089 24.75c.007-.16.04-.193.086-.083.041.1.036.219-.011.265-.047.046-.081-.036-.075-.182zm-21.332-2.874c0-.03.112-.138.248-.242l.25-.19-.196.242c-.186.23-.302.303-.302.19zm-13.53-.734c.102-.04.225-.035.272.01.047.047-.037.08-.186.074-.166-.007-.2-.04-.086-.084z" style="fill:#606060;fill-opacity:1;stroke-width:.140185" transform="matrix(1.05551 0 0 1.0735 -1.74 -1.355)"/><path d="M19.244 38.587c.001-.38.029-.519.061-.309.033.21.032.521-.002.692-.033.17-.06-.002-.06-.383zm14.173-5.928c0-.028.112-.137.249-.242l.249-.19-.195.243c-.186.23-.303.303-.303.19zm10.694-8.52c0-.265.03-.374.065-.241.036.133.036.35 0 .484-.036.133-.065.024-.065-.242zm-.022-.771c.007-.161.04-.194.086-.084.041.1.036.22-.011.265-.047.046-.081-.035-.075-.181zM9.653 21.142c.103-.04.225-.035.273.01.047.047-.037.08-.187.074-.166-.007-.2-.04-.086-.084zM37.521 9.519l-.195-.242.249.19c.237.18.312.294.195.294-.03 0-.141-.109-.249-.242zM23.156 4.551c.103-.04.226-.035.273.011.047.046-.037.079-.187.073-.165-.007-.199-.04-.086-.084z" style="fill:#494949;fill-opacity:1;stroke-width:.140185" transform="matrix(1.05551 0 0 1.0735 -1.74 -1.355)"/><path d="M22.293 43.077c-1.266-.14-3.605-.666-4.945-1.113-5.51-1.835-10.571-6.878-12.408-12.363-.716-2.138-.8-2.733-.802-5.709-.002-3.09.133-4.032.871-6.089 1.558-4.342 4.184-7.533 8.422-10.233 2.703-1.723 5.62-2.658 9.153-2.933 3.997-.31 7.31.333 10.887 2.117 3.071 1.532 6.032 4.227 7.814 7.111 1.97 3.19 2.807 6.176 2.802 9.985-.004 2.959-.353 4.778-1.378 7.186-2.039 4.79-6.483 8.972-11.495 10.815-2.816 1.035-6.31 1.516-8.921 1.226zm-3.057-1.448c.067-.228.08-1.892.028-3.698-.052-1.806-.063-3.284-.024-3.284.038 0 .35.12.691.265.343.145 1.39.432 2.328.637l1.706.373 1.635-.079c2.01-.097 2.93-.327 4.78-1.199 2.24-1.054 3.708-2.327 5.122-4.445 2.557-3.83 2.485-8.985-.182-12.921-2.456-3.625-6.56-5.614-11.142-5.398-3.473.163-5.736 1.2-8.464 3.877-1.57 1.541-2.5 2.87-3.187 4.565-.917 2.257-.9 2.07-.954 10.316l-.05 7.535 1.177.847c1.73 1.245 3.291 2.13 4.655 2.639 1.437.535 1.715.53 1.88-.03zm4.825-14.735c-.735-.219-1.674-1.223-1.932-2.066-.592-1.94.91-3.874 3.004-3.865 1.718.008 3.025 1.362 3.025 3.133 0 .862-.655 1.972-1.437 2.436-.736.437-1.883.593-2.66.362zm-13.69-5.748 1.305-.09.55-1.141c1.527-3.17 3.556-5.351 6.497-6.987.694-.386 1.338-.774 1.431-.863.131-.124.124-.772-.03-2.857-.11-1.483-.202-2.824-.205-2.98a1.044 1.044 0 0 0-.183-.52l-.177-.235-1.06.286c-1.447.39-4.04 1.612-5.69 2.68-1.448.938-3.48 2.868-4.745 4.505-1.539 1.993-3.742 7.44-3.294 8.144.106.168 3.503.203 5.602.058z" style="fill:#333;fill-opacity:1;stroke-width:.140185" transform="matrix(1.05551 0 0 1.0735 -1.74 -1.355)"/></svg>
+    </a>
 </td><td>
    <div class="tooltip">
        <button id="simulate" class="btn">
@@ -1151,7 +1151,7 @@ const pflowWidgetTemplate = (sourceCode, opts = defaultSandboxOptions) => `<!DOC
     </style>
 </head>
 <body>
-<iframe id="pflow-model" width="1000" height="1550" src="https://pflow.dev/index.html?o[]=vi&o[]=term&o[]=editor&x=${sourceCode}">
+<iframe id="pflow-model" width="1000" height="1550" src="${window.location.href.split('?')[0]}?z=${sourceCode}">
 </iframe>
 </body>
 </html>`;
@@ -1180,6 +1180,9 @@ const pflow2html = (sourceCode, opts = defaultSandboxOptions) => `<!DOCTYPE html
     <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
     <link href="${opts.baseurl}/styles/pflow.css" rel="stylesheet"/>
     <script src="${opts.baseurl}/src/pflow.js"></script>
+    <script>
+        defaultPflowSandboxOptions.vim = false;
+    </script>
 </head>
 <body onload=(runPflowSandbox())>
 ${pflowStats}
