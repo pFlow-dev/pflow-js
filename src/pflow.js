@@ -24,13 +24,15 @@
 
 /**
  * Types of models supported by pflow
- * @type {{stateMachine: string, workflow: string, petriNet: string}}
+ * @type {{elementary: string, workflow: string, petriNet: string}}
  */
 const PFlowModel = {
     petriNet: 'petriNet',
     workflow: 'workflow',
-    stateMachine: 'stateMachine'
+    elementary: 'elementary'
 };
+
+const version = 'v0';
 
 /**
  * PFlowStream manages the state of a collection of models.
@@ -119,11 +121,11 @@ function pflowStream({ models }) {
 
 /**
  * pflowModel is a factory function that creates a model object
- * that can be used to simulate a petriNet, workflow, or state machine.
+ * that can be used to simulate a petriNet, workflow, or elementary net
  * @param schema
  * @param declaration
  * @param type
- * @returns metamodel
+ * @returns Model
  */
 function pflowModel({ schema, declaration, type }) {
 
@@ -147,19 +149,33 @@ function pflowModel({ schema, declaration, type }) {
     function fn(label, role, position) {
         const transition = { label, role, position, guards: {}, delta: {} };
         def.transitions[label] = transition;
+
+        function guard(weight, target) {
+            def.arcs.push({
+                source: { transition },
+                target: target,
+                weight: weight,
+                inhibit: true,
+                inverted: true
+            });
+            assert(target.place, "target node must be a place");
+        }
+        function tx(weight, target) {
+            assert(target, "target is null");
+            assert(target.place, "target node must be a place");
+            def.arcs.push({
+                source: { transition: transition },
+                target,
+                weight,
+                inhibit: false
+            });
+        }
+
         // REVIEW: should we support transaction types? i.e. and / or for inputs?
         return {
             transition: transition,
-            tx: (weight, target) => {
-                assert(target, "target is null");
-                assert(target.place, "target node must be a place");
-                def.arcs.push({
-                    source: { transition: transition },
-                    target,
-                    weight,
-                    inhibit: false
-                });
-            }
+            tx,
+            guard
         };
     }
 
@@ -227,6 +243,59 @@ function pflowModel({ schema, declaration, type }) {
         return v;
     }
 
+    function loadDeclarationObject(obj) {
+        if (obj.version !== version) {
+            throw new Error("invalid model version: " + obj.version);
+        }
+        const nodes = {};
+        for (const [label, _] of Object.entries(obj.places)) {
+            const { initial, capacity, x, y } = obj.places[label];
+            nodes[label] = cell(label, initial, capacity, { x, y });
+        }
+        for (const [label, _] of Object.entries(obj.transitions)) {
+            const { x, y } = obj.transitions[label];
+            nodes[label] = fn(label, { label: "default" }, { x, y });
+        }
+        for (const arc of obj.arcs) {
+            const { source, target, weight, inhibit, reentry } = arc;
+            const sourceObj = nodes[source];
+            const targetObj = nodes[target];
+            if (!sourceObj) {
+                throw new Error("invalid arc sourceObj: " + source);
+            }
+            if (!targetObj) {
+                throw new Error("invalid arc targetObj: " + target);
+            }
+            if (obj.places[source]) {
+                if (!obj.transitions[target]) {
+                    throw new Error("invalid arc target label: " + target);
+                }
+                if (inhibit) {
+                    sourceObj.guard(weight, targetObj);
+                } else {
+                    sourceObj.tx(weight, targetObj);
+                }
+                if (reentry) {
+                    throw new Error("reentry must use transition->place arc");
+                }
+            } else if (obj.transitions[source]) {
+                if (!obj.places[target]) {
+                    throw new Error("invalid arc");
+                }
+                if (inhibit) {
+                    // FIXME: inhibit is not supported on transition->place arcs
+                    sourceObj.guard(weight, targetObj);
+                } else {
+                    sourceObj.tx(weight, targetObj);
+                }
+                if (reentry) {
+                    // FIXME: reentry is not supported
+                    sourceObj.reentry(targetObj);
+                }
+            }
+        }
+    }
+
     function index() {
         for (const transition of Object.values(def.transitions)) {
             transition.delta = emptyVector(); // right size all deltas
@@ -234,12 +303,23 @@ function pflowModel({ schema, declaration, type }) {
         let ok = true;
         for (const arc of Object.values(def.arcs)) {
             if (arc.inhibit) {
-                const g = {
-                    label: arc.source.place.label,
-                    delta: emptyVector()
-                };
-                g.delta[arc.source.place.offset] = 0 - arc.weight;
-                arc.target.transition.guards[arc.source.place.label] = g;
+                if (arc.source.transition && arc.target.place) {
+                    arc.source.transition.guards[arc.target.place.label] = {
+                        label: arc.target.place.label,
+                        delta: emptyVector()
+                    };
+                    arc.source.transition.inverted = true;
+                    arc.source.transition.guards[arc.target.place.label].delta[arc.target.place.offset] = 0 - arc.weight;
+                } else if (arc.source.place && arc.target.transition) {
+                    const g = {
+                        label: arc.source.place.label,
+                        delta: emptyVector()
+                    };
+                    arc.target.transition.guards[arc.source.place.label] = g;
+                    g.delta[arc.source.place.offset] = 0 - arc.weight;
+                } else {
+                    ok = false;
+                }
             } else if (arc.source.transition) {
                 arc.source.transition.delta[arc.target.place.offset] = arc.weight;
             } else if (arc.source.place) {
@@ -306,7 +386,7 @@ function pflowModel({ schema, declaration, type }) {
     function fire(fireArgs, resolve, reject) {
         let res = testFire(fireArgs);
         switch (def.type) {
-            case PFlowModel.stateMachine:
+            case PFlowModel.elementary:
                 if (!res.ok) {
                     break;
                 }
@@ -353,17 +433,22 @@ function pflowModel({ schema, declaration, type }) {
         return res;
     }
 
-    if (typeof declaration === 'string') {}
-
     if (typeof declaration === 'function') {
         declaration({ fn, cell, role });
-        if (!index()) {
-            throw new Error("invalid declaration");
+    } else if (typeof declaration === 'object') {
+        if (declaration.version) {
+            loadDeclarationObject(declaration);
+            try {} catch (e) {
+                throw new Error("invalid declaration: " + e);
+            }
+        } else if (declaration.transitions && declaration.places) {
+            def.places = declaration.places;
+            def.transitions = declaration.transitions;
+            def.arcs = declaration.arcs;
         }
-    }
-    if (typeof declaration === 'object') {
-        def.places = declaration.places;
-        def.transitions = declaration.transitions;
+        if (!index()) {
+            throw new Error("invalid declaration: failed to index");
+        }
     }
 
     function isClose(a, b) {
@@ -423,8 +508,64 @@ function pflowModel({ schema, declaration, type }) {
         return { width: limitX + margin, height: limitY + margin };
     }
 
+    function toObject() {
+        let places = {};
+        let transitions = {};
+        const arcs = [];
+        for (const label in def.places) {
+            const p = def.places[label];
+            const { initial, capacity, offset, position } = p;
+            let pl = { offset, x: position.x, y: position.y };
+            if (initial) {
+                pl.initial = initial;
+            }
+            if (capacity) {
+                pl.capacity = capacity;
+            }
+            places[label] = pl;
+        }
+        for (const label in def.transitions) {
+            const t = def.transitions[label];
+            let guards = {};
+            Object.values(t.guards || {}).forEach((g, k) => {
+                const { delta } = g;
+                guards[k] = delta;
+            });
+            const { position } = t;
+            const role = { label: "default" }; // (t.role || { label: "default"}).label;
+            if (t.role && t.role.label !== "default") {
+                transitions[label] = { role, x: position.x, y: position.y };
+            } else {
+                transitions[label] = { x: position.x, y: position.y };
+            }
+        }
+        def.arcs.forEach(a => {
+            let rec = {
+                source: a.source.transition ? a.source.transition.label : a.source.place.label,
+                target: a.target.transition ? a.target.transition.label : a.target.place.label,
+                weight: Math.abs(a.weight)
+            };
+            if (a.inhibit) {
+                rec.inhibit = true;
+            }
+            if (a.reentry) {
+                rec = rec.reentry = true;
+            }
+            arcs.push(rec);
+        });
+        return {
+            modelType: def.type,
+            version,
+            places,
+            transitions,
+            arcs
+        };
+    }
+
     return {
         def,
+        version,
+        toObject,
         dsl: { fn, cell, role },
         capacity: capacityVector(),
         getSize,
@@ -623,13 +764,25 @@ function pflow2svg(model, options = {}) {
                 source: transitions[txn],
                 target: place
             });
-            arcTags += arcTemplate({
-                // return
-                offsetX, offsetY, x1, y1, x2, y2, midX, midY, // pts
-                stroke: "black",
-                markerEnd: `url(${hash}markerInhibit1)`,
-                weight: Math.abs(transitions[txn].guards[label].delta[place.offset])
-            });
+
+            // check for inverted arc
+            if (transitions[txn].inverted) {
+                arcTags += arcTemplate({
+                    // return
+                    offsetX, offsetY, x1, y1, x2, y2, midX, midY, // pts
+                    stroke: "black",
+                    markerEnd: `url(${hash}markerInhibit1)`,
+                    weight: Math.abs(transitions[txn].guards[label].delta[place.offset])
+                });
+            } else {
+                arcTags += arcTemplate({
+                    // return
+                    offsetX, offsetY, x1: x2, y1: y2, x2: x1, y2: y1, midX, midY, // pts
+                    stroke: "black",
+                    markerEnd: `url(${hash}markerInhibit1)`,
+                    weight: Math.abs(transitions[txn].guards[label].delta[place.offset])
+                });
+            }
         }
     }
     for (const txn in transitions) {
@@ -823,11 +976,30 @@ function pflowSandboxFactory(handler, options = defaultPflowSandboxOptions) {
     return sandbox;
 }
 
+const defaultObjectSample = `const declaration = {
+    "modelType": "petriNet",
+    "version": "v0",
+    "places": {
+       "foo": { "offset": 0, "x": 480, "y": 320, "initial": 1, "capacity": 3 }
+    },
+    "transitions": {
+         "bar": { "x": 400, "y": 400 },
+         "baz": { "x": 560, "y": 400 },
+         "add": { "x": 400, "y": 240 },
+         "sub": { "x": 560, "y": 240 }
+    },
+    "arcs": [
+         { "source": "add", "target": "foo", "weight": 1 },
+         { "source": "foo", "target": "sub", "weight": 1 },
+         { "source": "bar", "target": "foo", "weight": 3, "inhibit": true },
+         { "source": "foo", "target": "baz", "weight": 1, "inhibit": true }
+    ]
+};`;
+
 /**
  * Default code sample is the model of a game of tic-tac-toe
  */
 const defaultCodeSample = `${pflowStandardFunctionSignature} {
-
     // REVIEW: code in use at https://pflow.dev/demo/tictactoe/
 
     let dx = 220;
@@ -922,7 +1094,7 @@ function downloadZippedSource(source) {
 // requires JSZip
 function pflowZip(source) {
     if (window !== undefined) {
-        // ideal is to say within one std IPFS chunk
+        // ideal is to stay within one standard IPFS chunk
         const kbSize = new TextEncoder().encode(source).length / 1024;
         if (kbSize > 256) {
             alert('source code limit is 256 kb');
@@ -1157,7 +1329,7 @@ const pflowWidgetTemplate = (sourceCode, opts = defaultSandboxOptions) => `<!DOC
 </html>`;
 
 /**
- * pflow@html can be used from the browser or nodejs
+ * pflow2html can be used from the browser or nodejs
  * ```js
  * require("fs");
  * const p = require('./pflow.js');
@@ -1181,7 +1353,7 @@ const pflow2html = (sourceCode, opts = defaultSandboxOptions) => `<!DOCTYPE html
     <link href="${opts.baseurl}/styles/pflow.css" rel="stylesheet"/>
     <script src="${opts.baseurl}/src/pflow.js"></script>
     <script>
-        defaultPflowSandboxOptions.vim = false;
+        defaultPflowSandboxOptions.vim = true;
     </script>
 </head>
 <body onload=(runPflowSandbox())>
@@ -1205,6 +1377,6 @@ if (typeof module !== 'undefined') {
         pflow2html,
         pflow2png,
         pflow2svg,
-        modelSource: { ticTacToe: defaultCodeSample }
+        modelSource: { ticTacToe: defaultCodeSample, test: defaultObjectSample }
     };
 }

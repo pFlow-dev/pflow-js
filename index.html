@@ -14,7 +14,7 @@
     <link href="./styles/pflow.css" rel="stylesheet"/>
     <script src="./src/pflow.js"></script>
     <script>
-        defaultPflowSandboxOptions.vim = false;
+        defaultPflowSandboxOptions.vim = true;
     </script>
 </head>
 <body onload=(runPflowSandbox())>
@@ -88,56 +88,25 @@
 </td></tr>
 </table>
 <canvas id="pflow-canvas" height="600px" width="1116px"></canvas>
-<pre id="editor">function declaration({fn, cell, role}) {
-
-    // REVIEW: code in use at https://pflow.dev/demo/tictactoe/
-
-    let dx = 220;
-    let dy = 140;
-
-    let X = 'X';
-    let O = 'O';
-
-    function row (n) {
-        return [
-            cell(n+"0", 1, 1, { x: 1*dx, y: (n+1)*dy}),
-            cell(n+"1", 1, 1, { x: 2*dx, y: (n+1)*dy}),
-            cell(n+"2", 1, 1, { x: 3*dx, y: (n+1)*dy})
-        ];
-    }
-    let board = [ row(0), row(1), row(2) ];
-
-    let players =  {
-        X: {
-            turn: cell(X, 1, 1, { x: 40, y: 200 }), // track turns, X goes first
-            role: role(X), // player X can only mark X's
-            next: O,
-            dx: -60
-        },
-        O: {
-            turn: cell(O, 0, 1, { x: 830, y: 370}), // track turns, O moves second
-            role: role(O), // player O can only mark O's
-            next: X,
-            dx: 60
-        }
-    };
-
-    for (let i in  board) {
-        for (let j in  board[i]) {
-            for (let marking in players) {
-                player = players[marking];
-                let {position} = board[i][j].place; // use place for relative positioning
-                move = fn(marking+i+j, player.role, { // declare a move
-                    x: position.x+player.dx, // position using each player's unique delta
-                    y: position.y,
-                });
-                player.turn.tx(1, move); // take turn
-                board[i][j].tx(1, move); // take board space
-                move.tx(1, players[player.next].turn); // mark next turn
-            }
-        }
-    }
-}</pre>
+<pre id="editor">const declaration = {
+    "modelType": "petriNet",
+    "version": "v0",
+    "places": {
+       "foo": { "offset": 0, "x": 480, "y": 320, "initial": 1, "capacity": 3 }
+    },
+    "transitions": {
+         "bar": { "x": 400, "y": 400 },
+         "baz": { "x": 560, "y": 400 },
+         "add": { "x": 400, "y": 240 },
+         "sub": { "x": 560, "y": 240 }
+    },
+    "arcs": [
+         { "source": "add", "target": "foo", "weight": 1 },
+         { "source": "foo", "target": "sub", "weight": 1 },
+         { "source": "bar", "target": "foo", "weight": 3, "inhibit": true },
+         { "source": "foo", "target": "baz", "weight": 1, "inhibit": true }
+    ]
+};</pre>
 <pre id="term"><a class="pflow-link" target="_blank" href="https://pflow.dev/about">pflow.dev petri-net editor</a></pre>
 </body>
 </html>
