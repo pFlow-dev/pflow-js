@@ -257,7 +257,8 @@ function pflowModel({ schema, declaration, type }) {
             nodes[label] = fn(label, { label: "default" }, { x, y });
         }
         for (const arc of obj.arcs) {
-            const { source, target, weight, inhibit, reentry } = arc;
+            const { source, target, inhibit, reentry } = arc;
+            const weight = arc.weight || 1;
             const sourceObj = nodes[source];
             const targetObj = nodes[target];
             if (!sourceObj) {
@@ -283,7 +284,6 @@ function pflowModel({ schema, declaration, type }) {
                     throw new Error("invalid arc");
                 }
                 if (inhibit) {
-                    // FIXME: inhibit is not supported on transition->place arcs
                     sourceObj.guard(weight, targetObj);
                 } else {
                     sourceObj.tx(weight, targetObj);
