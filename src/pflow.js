@@ -1079,9 +1079,30 @@ function pflowDragAndDrop(s) {
     });
 }
 
+const supportedDeclarations = {
+    'model.json': {
+        sample: defaultObjectSample,
+        handler: source => {
+            return `const declaration = ${source};`;
+        }
+    },
+    'declaration.js': {
+        sample: defaultCodeSample,
+        handler: source => {
+            return source;
+        }
+    }
+};
+
 function pflowUnzip(data) {
     return JSZip.loadAsync(data, { base64: true }).then(zip => {
-        return zip.file("declaration.js").async("string");
+        for (const name in supportedDeclarations) {
+            if (zip.files[name]) {
+                return zip.file(name).async("string").then(source => {
+                    return supportedDeclarations[name].handler(source);
+                });
+            }
+        }
     });
 }
 
