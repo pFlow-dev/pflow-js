@@ -55,13 +55,6 @@ describe("metamodel", () => {
         const { places, transitions, arcs } = m.def;
         console.log(JSON.stringify({places, transitions, arcs}, null, 2));
         console.log(JSON.stringify(m.toObject(), null, 2));
-
-        // convert model to svg
-        const svg = pflow2svg(m);
-        // write to fs
-        const fs = require('fs');
-        fs.writeFileSync('/tmp/test.svg', svg);
-
     })
 
 

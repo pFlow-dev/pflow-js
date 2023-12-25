@@ -438,17 +438,14 @@ function pflowModel({ schema, declaration, type }) {
     } else if (typeof declaration === 'object') {
         if (declaration.version) {
             loadDeclarationObject(declaration);
-            try {} catch (e) {
-                throw new Error("invalid declaration: " + e);
-            }
         } else if (declaration.transitions && declaration.places) {
             def.places = declaration.places;
             def.transitions = declaration.transitions;
             def.arcs = declaration.arcs;
         }
-        if (!index()) {
-            throw new Error("invalid declaration: failed to index");
-        }
+    }
+    if (!index()) {
+        throw new Error("invalid declaration: failed to index");
     }
 
     function isClose(a, b) {
@@ -866,13 +863,6 @@ function pflowSandbox(options = defaultPflowSandboxOptions) {
 
 const pflowEvalModelSource = options => `;;;pflowModel({ schema: '${options.canvasId}', declaration, type: PFlowModel.petriNet })`;
 
-// REVIEW: possibly support different function signatures for each type of model
-const pflowStandardFunctionSignature = 'function declaration({fn, cell, role})';
-
-function isValidSource(source) {
-    return source.startsWith(pflowStandardFunctionSignature);
-}
-
 function pflowTermDSL(editor, options) {
 
     // convenience function to use relative positions in ace editor
@@ -919,11 +909,7 @@ function pflowSandboxFactory(handler, options = defaultPflowSandboxOptions) {
     const { readModel, onSave } = pflowTermDSL(editor, options);
 
     const writeModel = source => {
-        if (isValidSource(source)) {
-            editor.setValue(source);
-        } else {
-            editor.error('Invalid model source');
-        }
+        editor.setValue(source);
     };
 
     const terminal = $('#term').terminal(command => {
@@ -980,13 +966,13 @@ const defaultObjectSample = `const declaration = {
     "modelType": "petriNet",
     "version": "v0",
     "places": {
-       "foo": { "offset": 0, "x": 480, "y": 320, "initial": 1, "capacity": 3 }
+       "foo": { "offset": 0, "x": 180, "y": 180, "initial": 1, "capacity": 3 }
     },
     "transitions": {
-         "bar": { "x": 400, "y": 400 },
-         "baz": { "x": 560, "y": 400 },
-         "add": { "x": 400, "y": 240 },
-         "sub": { "x": 560, "y": 240 }
+         "add": { "x": 120, "y": 120 },
+         "sub": { "x": 240, "y": 120 },
+         "bar": { "x": 120, "y": 240 },
+         "baz": { "x": 240, "y": 240 },
     },
     "arcs": [
          { "source": "add", "target": "foo", "weight": 1 },
@@ -999,54 +985,16 @@ const defaultObjectSample = `const declaration = {
 /**
  * Default code sample is the model of a game of tic-tac-toe
  */
-const defaultCodeSample = `${pflowStandardFunctionSignature} {
-    // REVIEW: code in use at https://pflow.dev/demo/tictactoe/
-
-    let dx = 220;
-    let dy = 140;
-
-    let X = 'X';
-    let O = 'O';
-
-    function row (n) {
-        return [
-            cell(n+"0", 1, 1, { x: 1*dx, y: (n+1)*dy}),
-            cell(n+"1", 1, 1, { x: 2*dx, y: (n+1)*dy}),
-            cell(n+"2", 1, 1, { x: 3*dx, y: (n+1)*dy})
-        ];
-    }
-    let board = [ row(0), row(1), row(2) ];
-
-    let players =  {
-        X: {
-            turn: cell(X, 1, 1, { x: 40, y: 200 }), // track turns, X goes first
-            role: role(X), // player X can only mark X's
-            next: O,
-            dx: -60
-        },
-        O: {
-            turn: cell(O, 0, 1, { x: 830, y: 370}), // track turns, O moves second
-            role: role(O), // player O can only mark O's
-            next: X,
-            dx: 60
-        }
-    };
-
-    for (let i in  board) {
-        for (let j in  board[i]) {
-            for (let marking in players) {
-                player = players[marking];
-                let {position} = board[i][j].place; // use place for relative positioning
-                move = fn(marking+i+j, player.role, { // declare a move
-                    x: position.x+player.dx, // position using each player's unique delta
-                    y: position.y,
-                });
-                player.turn.tx(1, move); // take turn
-                board[i][j].tx(1, move); // take board space
-                move.tx(1, players[player.next].turn); // mark next turn
-            }
-        }
-    }
+const defaultCodeSample = `function declaration({fn, cell, role}) {
+    const add = fn("add", { label: "default" }, {x: 120, y: 120});
+    const sub = fn("sub", { label: "default" }, {x: 240, y: 120});
+    const bar = fn("bar", { label: "default" }, {x: 120, y: 240});
+    const baz = fn("baz", { label: "default" }, {x: 240, y: 240});
+    const foo = cell("foo", 1, 3, {x: 180, y: 180});
+    add.tx(1, foo);
+    foo.tx(1, sub);
+    bar.guard(3, foo);
+    foo.guard(1, baz);
 }`;
 
 // requires jquery
@@ -1059,15 +1007,15 @@ function pflowDragAndDrop(s) {
             const reader = new FileReader();
             reader.onload = evt => {
                 const { result: source } = evt.target;
-                if (isValidSource(source)) {
+                try {
                     s.setValue(source);
                     s.update(s.readModel());
                     s.clear();
                     s.restart();
                     s.reload(s.schema);
                     s.echo("imported.");
-                } else {
-                    s.error("invalid source - js file expected to begin with:" + pflowStandardFunctionSignature);
+                } catch (e) {
+                    s.error("failed to load source: " + e.message);
                 }
             };
             reader.readAsText(files[0]);
@@ -1216,22 +1164,6 @@ async function runPflowSandbox() {
         }
     });
 }
-
-const pflowGithubLink = `<div>
-    <button id="github-button">
-    <a id="github-link" target="_blank" href="https://github.com/pFlow-dev/pflow-js">
-        <svg width="165" height="33">
-         <g transform="translate(0,3)">
-            <g transform="translate(4,3)">
-                <path d="M12 1.27a11 11 0 00-3.48 21.46c.55.09.73-.28.73-.55v-1.84c-3.03.64-3.67-1.46-3.67-1.46-.55-1.29-1.28-1.65-1.28-1.65-.92-.65.1-.65.1-.65 1.1 0 1.73 1.1 1.73 1.1.92 1.65 2.57 1.2 3.21.92a2 2 0 01.64-1.47c-2.47-.27-5.04-1.19-5.04-5.5 0-1.1.46-2.1 1.2-2.84a3.76 3.76 0 010-2.93s.91-.28 3.11 1.1c1.8-.49 3.7-.49 5.5 0 2.1-1.38 3.02-1.1 3.02-1.1a3.76 3.76 0 010 2.93c.83.74 1.2 1.74 1.2 2.94 0 4.21-2.57 5.13-5.04 5.4.45.37.82.92.82 2.02v3.03c0 .27.1.64.73.55A11 11 0 0012 1.27">
-                </path>
-            </g>
-            <text id="github-name" x="30" y="20">@pFlow-dev/pflow-js</text>
-        </g>
-        </svg>GithubStars
-    </a>
-    </button>
-</div>`;
 
 const pflowStats = `<table id="cdn-stats">
 <tr><td>
@@ -1387,7 +1319,6 @@ ${pflowToolbar}
 </html>`;
 
 if (typeof module !== 'undefined') {
-
     module.exports = {
         ModelType: PFlowModel,
         newSandbox: pflowSandbox,
@@ -1398,6 +1329,6 @@ if (typeof module !== 'undefined') {
         pflow2html,
         pflow2png,
         pflow2svg,
-        modelSource: { ticTacToe: defaultCodeSample, test: defaultObjectSample }
+        modelSource: { func: defaultCodeSample, obj: defaultObjectSample }
     };
 }
