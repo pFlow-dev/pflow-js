@@ -357,8 +357,10 @@ function pflowModel({ schema, declaration, type }) {
         }
         for (const guard of Object.values(t.guards)) {
             const res = vectorAdd(state, guard.delta, multiple);
-            if (res.ok) {
-                return { ok: true }; // inhibitor active
+            if (t.inverted) {
+                return { ok: res.ok === false };
+            } else {
+                return { ok: res.ok };
             }
         }
         return { ok: false }; // inhibitor inactive
@@ -446,6 +448,8 @@ function pflowModel({ schema, declaration, type }) {
     }
     if (!index()) {
         throw new Error("invalid declaration: failed to index");
+    } else {
+        console.log(def);
     }
 
     function isClose(a, b) {
@@ -591,7 +595,6 @@ function pflowModel({ schema, declaration, type }) {
  * @returns {{state: Map<any, any>, history: [], seq: number, models: Map<any, any>, dispatch(*): *, restart(): void}}
  */
 function pflow2png({ canvasId, declaration, handler, state: inputState }) {
-    // TODO: use inputState
     const schema = canvasId;
     const domURL = window.URL || window.webkitURL || window;
     const m = pflowModel({ schema, type: PFlowModel.petriNet, declaration });
@@ -986,10 +989,11 @@ const defaultObjectSample = `const declaration = {
  * Default code sample is the model of a game of tic-tac-toe
  */
 const defaultCodeSample = `function declaration({fn, cell, role}) {
-    const add = fn("add", { label: "default" }, {x: 120, y: 120});
-    const sub = fn("sub", { label: "default" }, {x: 240, y: 120});
-    const bar = fn("bar", { label: "default" }, {x: 120, y: 240});
-    const baz = fn("baz", { label: "default" }, {x: 240, y: 240});
+    const r = role("default");
+    const add = fn("add", r, {x: 120, y: 120});
+    const sub = fn("sub", r, {x: 240, y: 120});
+    const bar = fn("bar", r, {x: 120, y: 240});
+    const baz = fn("baz", r, {x: 240, y: 240});
     const foo = cell("foo", 1, 3, {x: 180, y: 180});
     add.tx(1, foo);
     foo.tx(1, sub);
