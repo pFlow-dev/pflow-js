@@ -454,8 +454,6 @@ function pflowModel({ schema, declaration, type }) {
     }
     if (!index()) {
         throw new Error("invalid declaration: failed to index");
-    } else {
-        console.log(def);
     }
 
     function isClose(a, b) {
@@ -843,26 +841,11 @@ const defaultPflowSandboxOptions = {
  */
 function pflowSandbox(options = defaultPflowSandboxOptions) {
     return pflowSandboxFactory(s => {
-        const updatePermaLink = () => {
-            const url = window.location.href.split('?')[0];
-            pflowZip(s.getValue(), 'declaration.js').then(data => {
-                // get current URL with no params
-                $('#share').attr('href', `${url}?z=${data}`);
-            }).then(() => {
-                const m = s.getModel('pflow-canvas');
-                const jsonData = m.toObject();
-                if (jsonData.version === 'v0') {
-                    pflowZip(JSON.stringify(jsonData, null, 2), 'model.json').then(data => {
-                        $('#editLink').attr('href', `${defaultPflowSandboxOptions.editorUrl}?z=${data}`);
-                    });
-                }
-            });
-        };
         s.onSave(() => {
             s.update(s.readModel());
             s.clear();
             s.reload(s.schema);
-            updatePermaLink();
+            s.updatePermaLink();
         });
         s.onFail(({ state, action, multiple, role }) => {
             s.error(JSON.stringify({
@@ -875,7 +858,6 @@ function pflowSandbox(options = defaultPflowSandboxOptions) {
             }));
         });
         pflowDragAndDrop(s);
-        updatePermaLink();
     }, options);
 }
 
@@ -955,6 +937,22 @@ function pflowSandboxFactory(handler, options = defaultPflowSandboxOptions) {
         declaration: readModel().def
     });
 
+    const updatePermaLink = () => {
+        const url = window.location.href.split('?')[0];
+        pflowZip(editor.getValue(), 'declaration.js').then(data => {
+            // get current URL with no params
+            $('#share').attr('href', `${url}?z=${data}`);
+        }).then(() => {
+            const m = s.dispatcher.getModel('pflow-canvas');
+            const jsonData = m.toObject();
+            if (jsonData.version === 'v0') {
+                pflowZip(JSON.stringify(jsonData, null, 2), 'model.json').then(data => {
+                    $('#editLink').attr('href', `${defaultPflowSandboxOptions.editorUrl}?z=${data}`);
+                });
+            }
+        });
+    };
+
     const sandbox = {
         error: terminal.error,
         echo: terminal.echo,
@@ -971,9 +969,10 @@ function pflowSandboxFactory(handler, options = defaultPflowSandboxOptions) {
         update: s.dispatcher.update,
         reload: s.dispatcher.reload,
         restart: s.restart,
-        writeModel,
-        readModel,
-        terminal,
+        writeModel: writeModel,
+        readModel: readModel,
+        terminal: terminal,
+        updatePermaLink,
         onSave
     };
     handler(sandbox);
@@ -1034,6 +1033,7 @@ function pflowDragAndDrop(s) {
                     s.restart();
                     s.reload(s.schema);
                     s.echo("imported.");
+                    s.updatePermaLink();
                 } catch (e) {
                     s.error("failed to load source: " + e.message);
                 }
@@ -1181,13 +1181,13 @@ async function runPflowSandbox() {
         if (!params.z) {
             return;
         }
-        const kbSize = new TextEncoder().encode(params.z).length / 1024;
         const source = await pflowUnzip(params.z);
         s.setValue(source);
         s.update(s.readModel());
         s.clear();
         s.reload(s.schema);
         s.echo("imported.");
+        s.updatePermaLink();
     });
 }
 
