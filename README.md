@@ -1,27 +1,17 @@
-# pflow-js
+# pflow-js: Petri-net Sandbox
 
 [![](https://data.jsdelivr.com/v1/package/gh/pflow-dev/pflow-js/badge)](https://www.jsdelivr.com/package/gh/pflow-dev/pflow-js)
 
-Pflow-js is an open-source (MIT) toolkit for coding peti-net models.
+Pflow-js is an open-source (MIT) toolkit for
+interactive editing and simulation of Petri nets,
+designed for ease of embedding and sharing.
 
 Supports: Workflows, Petri-Nets, and State-Machines.
 
+Try the app: https://pflow.dev/sandbox/
 
-## Status
-
-Stable - no known issues
-
-
-```js
-module.exports = {
-    ModelType: PFlowModel, // model types constant / enum
-    newSandbox: pflowSandbox, // browser-only loads sandbox & event handlers int the browser
-    newStream: pflowStream, // browser or nodejs - construct a new stream
-    newModel: pflowModel, // browser or nodejs - construct a new model
-    pflow2Html, // browser or nodejs - export source code w/ sandbox template
-    pflow2png, // browser only - render a png using html5/canvas
-    pflow2svg, // browser or nodejs - export diagram as an svg string
-    modelSource: { ticTacToe: defaultCodeSample }, // default code samples
-    makeSandbox // nodejs-only - write a new sandbox index.html
-};
-```
+Key Features
+------------
+- *Interactive Petri Net Editing*: Create and modify Petri nets with an intuitive, user-friendly interface.
+- *Dynamic Simulation*: Simulate and visualize Petri net behavior in real-time within the browser.
+- *Embedding and Exporting*: Easily embed interactive Petri nets in websites and export them for sharing.

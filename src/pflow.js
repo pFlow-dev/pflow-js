@@ -61,6 +61,13 @@ class PFlowStream {
             update: model => {
                 this.models.set(model.def.schema, model);
             },
+            getModel: schema => {
+                const m = this.models.get(schema);
+                if (!m) {
+                    throw new Error(`model not found: ${schema}`);
+                }
+                return m;
+            },
             reload: schema => {
                 eventHandlers.get("__onReload__")(this, { action: 'reload', schema });
             }
@@ -171,7 +178,6 @@ function pflowModel({ schema, declaration, type }) {
             });
         }
 
-        // REVIEW: should we support transaction types? i.e. and / or for inputs?
         return {
             transition: transition,
             tx,
@@ -827,7 +833,8 @@ const defaultPflowSandboxOptions = {
     marginX: 0,
     marginY: 0,
     canvasId: 'pflow-canvas',
-    vim: false // don't use vim mode by default
+    vim: false, // don't use vim mode by default
+    editorUrl: 'https://pflow.dev/p/'
 };
 
 /**
@@ -837,17 +844,25 @@ const defaultPflowSandboxOptions = {
 function pflowSandbox(options = defaultPflowSandboxOptions) {
     return pflowSandboxFactory(s => {
         const updatePermaLink = () => {
-            pflowZip(s.getValue()).then(data => {
+            const url = window.location.href.split('?')[0];
+            pflowZip(s.getValue(), 'declaration.js').then(data => {
                 // get current URL with no params
-                const url = window.location.href.split('?')[0];
                 $('#share').attr('href', `${url}?z=${data}`);
+            }).then(() => {
+                const m = s.getModel('pflow-canvas');
+                const jsonData = m.toObject();
+                if (jsonData.version === 'v0') {
+                    pflowZip(JSON.stringify(jsonData, null, 2), 'model.json').then(data => {
+                        $('#editLink').attr('href', `${defaultPflowSandboxOptions.editorUrl}?z=${data}`);
+                    });
+                }
             });
         };
         s.onSave(() => {
-            updatePermaLink();
             s.update(s.readModel());
             s.clear();
             s.reload(s.schema);
+            updatePermaLink();
         });
         s.onFail(({ state, action, multiple, role }) => {
             s.error(JSON.stringify({
@@ -952,6 +967,7 @@ function pflowSandboxFactory(handler, options = defaultPflowSandboxOptions) {
         onEvery: callback => {
             s.dispatcher.onEvery((_, evt) => callback(evt));
         },
+        getModel: s.dispatcher.getModel,
         update: s.dispatcher.update,
         reload: s.dispatcher.reload,
         restart: s.restart,
@@ -1065,7 +1081,7 @@ function downloadZippedSource(source) {
 }
 
 // requires JSZip
-function pflowZip(source) {
+function pflowZip(source, filename = 'declaration.js') {
     if (window !== undefined) {
         // ideal is to stay within one standard IPFS chunk
         const kbSize = new TextEncoder().encode(source).length / 1024;
@@ -1076,7 +1092,14 @@ function pflowZip(source) {
         }
     }
     const zip = new JSZip();
-    zip.file("declaration.js", source);
+    switch (filename) {
+        case 'model.json':
+        case 'declaration.js':
+            zip.file(filename, source);
+            break;
+        default:
+            throw new Error("unsupported filename: " + filename);
+    }
     return zip.generateAsync({
         type: "base64"
     }).then(function (content) {
@@ -1155,17 +1178,16 @@ async function runPflowSandbox() {
         return false;
     });
     return getQueryParams().then(async params => {
-        if (params.z) {
-            // REVIEW: could have a max limit here too
-            const kbSize = new TextEncoder().encode(params.z).length / 1024;
-            console.log({ kbSize }, 'loading zipped source');
-            const source = await pflowUnzip(params.z);
-            s.setValue(source);
-            s.update(s.readModel());
-            s.clear();
-            s.reload(s.schema);
-            s.echo("imported.");
+        if (!params.z) {
+            return;
         }
+        const kbSize = new TextEncoder().encode(params.z).length / 1024;
+        const source = await pflowUnzip(params.z);
+        s.setValue(source);
+        s.update(s.readModel());
+        s.clear();
+        s.reload(s.schema);
+        s.echo("imported.");
     });
 }
 
@@ -1235,6 +1257,7 @@ const pflowToolbar = `<table id="heading">
      </svg>Help</button>
 </a>
 </td><td>
+    <a href="?z=" id="editLink" target="_blank">edit</a>
     <input type="checkbox" id="viewCode" class="feature-flag" checked>Code</input>
     <input type="checkbox" id="viewTerminal" class="feature-flag" checked>Terminal</input>
 </td></tr>
