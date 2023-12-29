@@ -537,9 +537,8 @@ function pflowModel({ schema, declaration, type }) {
                 guards[k] = delta;
             });
             const { position } = t;
-            const role = { label: "default" }; // (t.role || { label: "default"}).label;
             if (t.role && t.role.label !== "default") {
-                transitions[label] = { role, x: position.x, y: position.y };
+                transitions[label] = { role: t.role.label, x: position.x, y: position.y };
             } else {
                 transitions[label] = { x: position.x, y: position.y };
             }
