@@ -53,7 +53,7 @@ Use the jsdelivr CDN to host your own version of the app
     <meta name="viewport" content="width=device-width,initial-scale=1"/>
     <title>pflow.dev | metamodel editor</title>
     <script defer="defer" src="https://cdn.jsdelivr.net/gh/pflow-dev/pflow-js@1.1.0/p/static/js/main.4602f11c.js"> </script>
-    <link href="https://cdn.jsdelivr.net/gh/pflow-dev/pflow-js@1.1.0/p/static/js/main.4602f11c.js" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/gh/pflow-dev/pflow-js@1.1.0/p/static/css/main.63d515f3.css" rel="stylesheet">
 </head>
 <body>
     <noscript>You need to enable JavaScript to run this app.</noscript>
