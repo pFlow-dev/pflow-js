@@ -40,3 +40,23 @@ Key Features
 The interactive editor react app is published to this repo's `./p` folder.
 
  https://github.com/pFlow-dev/pflow-editor
+
+ ## Deploy using CDN
+
+Use the jsdelivr CDN to host your own version of the app
+
+```html
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width,initial-scale=1"/>
+    <title>pflow.dev | metamodel editor</title>
+    <script defer="defer" src="https://cdn.jsdelivr.net/gh/pflow-dev/pflow-js@1.1.0/p/static/js/main.4602f11c.js"> </script>
+    <link href="https://cdn.jsdelivr.net/gh/pflow-dev/pflow-js@1.1.0/p/static/js/main.4602f11c.js" rel="stylesheet">
+</head>
+<body>
+    <noscript>You need to enable JavaScript to run this app.</noscript>
+    <div id="root"></div>
+</body></html>
+```
