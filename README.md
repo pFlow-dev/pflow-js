@@ -12,6 +12,15 @@ Try the app: https://pflow.dev/sandbox/
 
 Key Features
 ------------
-- *Interactive Petri Net Editing*: Create and modify Petri nets with an intuitive, user-friendly interface.
-- *Dynamic Simulation*: Simulate and visualize Petri net behavior in real-time within the browser.
-- *Embedding and Exporting*: Easily embed interactive Petri nets in websites and export them for sharing.
+- Interactive Petri Net Editing
+  - Create and modify Petri nets with an intuitive, user-friendly interface.
+- Dynamic Simulation
+  - Simulate and visualize Petri net behavior in real-time within the browser.
+- Embedding and Exporting
+  - Easily embed interactive Petri nets in websites and export them for sharing.
+
+## pflow-editor
+
+The interactive editor react app is published to this repo's `./public` folder.
+
+ https://github.com/pFlow-dev/pflow-editor
