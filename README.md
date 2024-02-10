@@ -8,7 +8,23 @@ designed for ease of embedding and sharing.
 
 Supports: Workflows, Petri-Nets, and State-Machines.
 
-Try the app: https://pflow.dev/sandbox/
+Try it out!
+
+- A JS sandbox that can view Petri-Nets
+  - https://pflow-dev.github.io/pflow-js/sandbox.html
+
+- Interactive Petri-Net Editor
+  - https://pflow-dev.github.io/pflow-js/p/
+
+- Our model hosting site https://pflow.dev 
+  - can render an svg image for markdown:
+
+```
+[![pflow](https://pflow.dev/img/zb2rhgQVj436skxwVfhjkoX2E8tHbuwvU3HHY5quYcFKZb38y.svg)](https://pflow.dev/p/zb2rhgQVj436skxwVfhjkoX2E8tHbuwvU3HHY5quYcFKZb38y/)
+```
+
+
+[![pflow](https://pflow.dev/img/zb2rhgQVj436skxwVfhjkoX2E8tHbuwvU3HHY5quYcFKZb38y.svg)](https://pflow.dev/p/zb2rhgQVj436skxwVfhjkoX2E8tHbuwvU3HHY5quYcFKZb38y/)
 
 Key Features
 ------------
@@ -21,6 +37,6 @@ Key Features
 
 ## pflow-editor
 
-The interactive editor react app is published to this repo's `./public` folder.
+The interactive editor react app is published to this repo's `./p` folder.
 
  https://github.com/pFlow-dev/pflow-editor
