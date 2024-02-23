@@ -1,6 +1,6 @@
 {
   "name": "@pflow-dev/pflow-js",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "build share-able petri-net models using an internal-js dsl and html5 canvas",
   "main": "./src/pflow.js",
   "files": [
